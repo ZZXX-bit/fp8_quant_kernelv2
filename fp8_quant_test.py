@@ -17,26 +17,31 @@ def main():
     
     # 创建范围在[-1000, 1000]的随机数据
     x = torch.rand(seq_len, hidden_size, device='cuda') * 2000 - 1000
-    x_cpu = x.cpu()
     
     print(f"开始测试FP8量化...")
     
+    # GPU预热
+    x_gpu_quant, scales_gpu = per_token_group_quant_fp8(x, group_size=group_size, column_major_scales=True)
+
     # 记录GPU实现的时间
     torch.cuda.synchronize()
-    start = time.time()
+    start = time.perf_counter()
     x_gpu_quant, scales_gpu = per_token_group_quant_fp8(x, group_size=group_size, column_major_scales=True)
     torch.cuda.synchronize()
-    gpu_time = time.time() - start
+    gpu_time = time.perf_counter() - start
     
     print(f"GPU实现完成，耗时: {gpu_time:.4f}秒")
     print(f"GPU量化结果形状: {x_gpu_quant.shape}, 缩放因子形状: {scales_gpu.shape}")
 
+    # vLLM预热
+    x_vllm_quant, scales_vllm = vllm_quant(x, group_size=group_size, column_major_scales=True)
+
     # 记录vllm实现的时间
     torch.cuda.synchronize()
-    start = time.time()
+    start = time.perf_counter()
     x_vllm_quant, scales_vllm = vllm_quant(x, group_size=group_size, column_major_scales=True)
     torch.cuda.synchronize()
-    vllm_time = time.time() - start
+    vllm_time = time.perf_counter() - start
     
     print(f"vllm实现完成，耗时: {vllm_time:.4f}秒")
     print(f"vllm量化结果形状: {x_vllm_quant.shape}, 缩放因子形状: {scales_vllm.shape}")
